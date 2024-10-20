@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Map</title>
+    <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #e0f7fa;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #map { 
+            flex: 1;
+            width: 100%;
+            height: calc(100vh - 135px);
+        }
+        .title-bar {
+            background-color: #00695c;
+            color: white;
+            text-align: center;
+            padding: 5px;
+            font-size: 1.2em;
+            height: 20px;
+            border: 2px solid white;
+            position: relative;
+        }
+        .mouza-bar {
+            background-color: black;
+            padding-left: 10px;
+            height: 30px;
+            position: relative;
+            border-bottom: 3px solid yellow;
+        }
+        .mouza-dropdown {
+            padding: 5px;
+            border-radius: 5px;
+            border: none;
+            background-color: white;
+            color: black;
+            font-size: 0.9em;
+            cursor: pointer;
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: auto;
+        }
+        .murabba-dropdown {
+            padding: 5px;
+            border-radius: 5px;
+            border: none;
+            background-color: white;
+            color: black;
+            font-size: 0.9em;
+            cursor: pointer;
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: auto;
+        }
+        .contact-bar {
+            background-color: black;
+            color: white;
+            text-align: center;
+            padding: 5px;
+            font-size: 1em;
+            border-top: 3px solid yellow;
+            position: relative;
+            bottom: 0;
+            width: 100%;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .extra-space {
+            height: 30px;
+            background-color: transparent;
+        }
+        .leaflet-control-attribution {
+            display: none;
+        }
+        .label-class {
+            background-color: white;
+            border: 1px solid black;
+            padding: 2px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="title-bar" id="titleBar">Digital Map and Geo Map</div>
+
+<div class="mouza-bar">
+    <select class="mouza-dropdown" id="mouzaSelector" onchange="switchMouza()">
+        <option value="">Select a Mouza</option>
+        <option value="73-P">73-P</option>
+    </select>
+    <select class="murabba-dropdown" id="murabbaSelector">
+        <option value="">Select a Murabba</option>
+    </select>
+</div>
+
+<div id="map"></div>
+
+<div class="contact-bar">Contact: Zubair Majid 03072753841</div>
+<div class="extra-space"></div>
+
+<script>
+    var map = L.map('map').setView([30.3753, 69.3451], 6); // Default view to Pakistan
+
+    // Satellite layer
+    var googleSatelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        attribution: 'Map data &copy; <a href="https://www.google.com/intl/en_us/help/terms_maps/">Google</a>',
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+    }).addTo(map);
+
+    var drawnItems = new L.FeatureGroup().addTo(map);
+
+    // Default polygon style
+    function defaultStyle() {
+        return {
+            color: "#3388ff",
+            weight: 2,
+            fillOpacity: 0.1
+        };
+    }
+
+    // Highlighted polygon style
+    function highlightStyle() {
+        return {
+            color: "yellow",
+            weight: 3,
+            fillOpacity: 0.5
+        };
+    }
+
+    var selectedLayer = null; // To track currently selected polygon
+    var murabbaLayers = {}; // Store Murabba layers for zooming
+
+    // Function to switch between Mouza maps
+    function switchMouza() {
+        var mouza = document.getElementById('mouzaSelector').value;
+
+        // Clear previous layers and reset the Murabba selector
+        drawnItems.clearLayers();
+        document.getElementById('murabbaSelector').innerHTML = '<option value="">Select a Murabba</option>';
+        selectedLayer = null; // Reset any previous selection
+        murabbaLayers = {}; // Reset Murabba layers
+
+        if (mouza === '73-P') {
+            document.getElementById('titleBar').innerText = "Mouza 73-P Map";
+
+            // Load JSON data for 73-P
+            var geojsonData = {
+                "type": "FeatureCollection",
+                "features": [
+                    { "type": "Feature", "properties": { "Murabba_No": "202/7" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 70.495490363242851, 28.539691637152259 ], [ 70.498915385667217, 28.539728206198085 ], [ 70.49895168076074, 28.537006960353221 ], [ 70.495526746052988, 28.536970388627285 ], [ 70.495490363242851, 28.539691637152259 ] ] ] } },
+                    { "type": "Feature", "properties": { "Murabba_No": "202/11" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 70.498915385667217, 28.539728206198085 ], [ 70.502340408091555, 28.53976477524391 ], [ 70.502376615468492, 28.53704353207916 ], [ 70.49895168076074, 28.537006960353221 ], [ 70.498915385667217, 28.539728206198085 ] ] ] } },
+                    // Add the remaining polygons...
+                ]
+            };
+
+            // Add GeoJSON data to the map
+            L.geoJSON(geojsonData, {
+                style: defaultStyle,
+                onEachFeature: function(feature, layer) {
+                    // Label the Murabba_No
+                    var center = layer.getBounds().getCenter(); // Get the center of the polygon
+                    L.marker(center, {
+                        icon: L.divIcon({
+                            className: 'label-class',
+                            html: feature.properties.Murabba_No,
+                            iconSize: [50, 20]
+                        })
+                    }).addTo(drawnItems);
+                    
+                    // Add Murabba to selector
+                    var option = document.createElement("option");
+                    option.value = feature.properties.Murabba_No;
+                    option.text = feature.properties.Murabba_No;
+                    document.getElementById('murabbaSelector').add(option);
+                    
+                    // Save the layer reference
+                    murabbaLayers[feature.properties.Murabba_No] = layer;
+                    
+                    // When a polygon is clicked, zoom to it and highlight it
+                    layer.on('click', function() {
+                        if (selectedLayer) {
+                            selectedLayer.setStyle(defaultStyle()); // Reset previous selection
+                        }
+
+                        selectedLayer = layer;
+                        layer.setStyle(highlightStyle()); // Highlight the clicked polygon
+                        map.fitBounds(layer.getBounds()); // Zoom to the polygon
+                    });
+                }
+            }).addTo(drawnItems);
+
+            // Zoom to the default location of Mouza 73-P
+            map.setView([28.5397, 70.4960], 16); 
+
+        } else {
+            // Reset to the default view if no Mouza is selected
+            document.getElementById('titleBar').innerText = "Digital Map and Geo Map";
+            map.setView([30.3753, 69.3451], 6); // Default view to Pakistan
+        }
+    }
+</script>
+</body>
+</html>
