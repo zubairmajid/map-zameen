@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Map</title>
+    <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet" />
+    <link href="https://unpkg.com/leaflet-measure/dist/leaflet-measure.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-measure/dist/leaflet-measure.js"></script>
+    <script src="https://unpkg.com/leaflet-omnivore@0.3.3/leaflet-omnivore.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <link href="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.css" rel="stylesheet" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #e0f7fa;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #map { 
+            flex: 1;
+            width: 100%;
+            height: calc(100vh - 135px);
+        }
+        .title-bar {
+            background-color: #00695c;
+            color: white;
+            text-align: center;
+            padding: 5px;
+            font-size: 1.2em;
+            height: 20px;
+            border: 2px solid white;
+            position: relative;
+        }
+        .mouza-bar {
+            background-color: black;
+            padding-left: 10px;
+            height: 30px;
+            position: relative;
+            border-bottom: 3px solid yellow;
+        }
+        .mouza-dropdown {
+            padding: 5px;
+            border-radius: 5px;
+            border: none;
+            background-color: white;
+            color: black;
+            font-size: 0.9em;
+            cursor: pointer;
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: auto;
+        }
+        .contact-bar {
+            background-color: black;
+            color: white;
+            text-align: center;
+            padding: 5px;
+            font-size: 1em;
+            border-top: 3px solid yellow;
+            position: relative;
+            bottom: 0;
+            width: 100%;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .extra-space {
+            height: 30px;
+            background-color: transparent;
+        }
+        .leaflet-control-attribution {
+            display: none;
+        }
+        .compass-image {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            z-index: 1000;
+            width: 160px;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="title-bar" id="titleBar">Digital Map and Geo Map</div>
+
+<div class="mouza-bar">
+    <select class="mouza-dropdown" id="mouzaSelector" onchange="switchMouza()">
+        <option value="">Select a Mouza</option>
+        <option value="Hameed Abad">Hameed Abad</option>
+        <option value="Azmat Abad">Azmat Abad</option>
+    </select>
+</div>
+
+<img src="east-west-compass-md.png" alt="Compass" class="compass-image">
+
+<div id="map"></div>
+
+<div class="contact-bar">Contact: Zubair Majid 03072753841</div>
+<div class="extra-space"></div>
+
+<script>
+    var map = L.map('map').setView([30.3753, 69.3451], 6);
+    
+    // Satellite layer
+    var googleSatelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        attribution: 'Map data &copy; <a href="https://www.google.com/intl/en_us/help/terms_maps/">Google</a>',
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+    });
+
+    // Street view layer
+    var googleStreetLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        attribution: 'Map data &copy; <a href="https://www.google.com/intl/en_us/help/terms_maps/">Google</a>',
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+    });
+
+    // Add the satellite layer by default
+    googleSatelliteLayer.addTo(map);
+
+    // Create a layer control and add it to the layerControl div
+    var baseMaps = {
+        "Satellite": googleSatelliteLayer,
+        "Street": googleStreetLayer
+    };
+    
+    var layerControl = L.control.layers(baseMaps).addTo(map);
+    layerControl.getContainer().style.position = 'absolute';
+    layerControl.getContainer().style.top = '50px'; // Adjust to position above the contact bar
+    layerControl.getContainer().style.right = '10px'; // Adjust to position on the right
+
+    var drawnItems = new L.FeatureGroup().addTo(map);
+    var searchMarker; // Variable to hold the search marker
+    var userLocation; // Variable to hold the user's location
+
+    // Add Leaflet Draw Control for shapes and markers
+    var drawControl = new L.Control.Draw({
+        edit: {
+            featureGroup: drawnItems
+        },
+        draw: {
+            polygon: true,
+            polyline: true,
+            rectangle: true,
+            circle: true,
+            marker: true // Allow drawing markers
+        }
+    });
+    map.addControl(drawControl);
+
+    // Event when a shape is drawn
+    map.on(L.Draw.Event.CREATED, function(event) {
+        var layer = event.layer;
+        drawnItems.addLayer(layer);
+
+        if (layer instanceof L.Marker) {
+            // For markers, show coordinates
+            var latLng = layer.getLatLng();
+            layer.bindPopup("Coordinates: " + latLng.lat.toFixed(5) + ", " + latLng.lng.toFixed(5)).openPopup();
+            copyCoordinates(latLng.lat, latLng.lng); // Copy coordinates
+        } else if (layer instanceof L.Polygon || layer instanceof L.Polyline || layer instanceof L.Rectangle) {
+            // For polygons and polylines, calculate area and perimeter
+            var latlngs = layer.getLatLngs();
+            var area = L.GeometryUtil.geodesicArea(latlngs);
+            var perimeter = latlngs.reduce((acc, curr, i, arr) => {
+                return acc + (i === arr.length - 1 ? curr.distanceTo(arr[0]) : curr.distanceTo(arr[i + 1]));
+            }, 0);
+            var areaInFeet = area * 10.7639; // Convert to square feet
+
+            var { kanal, marla } = convertToKanalMarla(areaInFeet);
+            var popupContent = "Area: " + kanal + " Kanal(s), " + marla + " Marla(s)<br>Perimeter: " + perimeter.toFixed(2) + " ft";
+            layer.bindPopup(popupContent).openPopup(); // Popup for polygons
+        }
+    });
+
+    // Function to copy coordinates
+    function copyCoordinates(lat, lng) {
+        var coords = lat + ", " + lng;
+        navigator.clipboard.writeText(coords).then(function() {
+            alert('Coordinates copied to clipboard: ' + coords);
+        });
+    }
+
+    // Geocoder Control for searching places
+    var geocoder = L.Control.geocoder({
+        defaultMarkGeocode: true
+    })
+    .on('markgeocode', function(e) {
+        var latlng = e.geocode.center;
+        map.setView(latlng, 16);
+        searchMarker = L.marker(latlng).addTo(map)
+            .bindPopup(e.geocode.name + "<br>Coordinates: " + latlng.lat.toFixed(5) + ", " + latlng.lng.toFixed(5))
+            .openPopup();
+
+        // Remove the marker after the next interaction (click)
+        map.once('click', function() {
+            map.removeLayer(searchMarker);
+        });
+    })
+    .addTo(map);
+
+    // Add Live Location Control
+    var locateControl = L.control.locate({
+        strings: {
+            title: "Show me where I am"
+        },
+        locateOptions: {
+            maxZoom: 16,
+            enableHighAccuracy: true
+        }
+    }).addTo(map);
+
+    // Event to handle "Locate" button click
+    document.querySelector('.leaflet-control-locate').onclick = function() {
+        map.locate({setView: true, maxZoom: 16}); // Only request location here
+    };
+
+    // Map event to handle location found
+    map.on('locationfound', function(e) {
+        userLocation = e.latlng; // Store user location
+        map.setView(e.latlng, 16); // Set the view to the user's location with a specific zoom level
+    });
+
+    // Map event to handle location error
+    map.on('locationerror', function(e) {
+        alert(e.message);
+    });
+
+    // Function to switch between Mouza maps
+    function switchMouza() {
+        var mouza = document.getElementById('mouzaSelector').value;
+
+        if (mouza === 'Hameed Abad') {
+            document.getElementById('titleBar').innerText = "Mouza Hameed Abad Map";
+            omnivore.kmz('http://localhost:8000/hameed_abad.kmz').on('ready', function(layer) {
+                map.fitBounds(layer.target.getBounds());
+            }).addTo(map);
+        } else if (mouza === 'Azmat Abad') {
+            document.getElementById('titleBar').innerText = "Mouza Azmat Abad Map";
+            omnivore.kmz('http://localhost:8000/azmat_abad.kmz').on('ready', function(layer) {
+                map.fitBounds(layer.target.getBounds());
+            }).addTo(map);
+        } else {
+            document.getElementById('titleBar').innerText = "Digital Map and Geo Map"; // Set default title here
+        }
+    }
+</script>
+</body>
+</html>
